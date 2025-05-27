@@ -1,0 +1,35 @@
+name: Retrieve and Deploy Salesforce Metadata
+
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - cron: '0 0 * * *' # Runs daily at midnight UTC
+  # push:
+  #   branches:
+  #     - main
+
+jobs:
+  retrieve_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Install Salesforce CLI
+        run: |
+          npm install @salesforce/cli -g
+          sf --version
+
+      - name: Authenticate with Salesforce
+        run: sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwt-key-file ${{ secrets.JWT_KEY }} --username ${{ secrets.USERNAME }} --instance-url ${{ secrets.INSTANCE_URL }}
+
+      - name: Retrieve metadata from Salesforce
+        run: sf project retrieve start --manifest manifest/package.xml
+
+      - name: Commit and push metadata to GitHub
+        run: |
+          git config --global user.email "muthu19726@gmail.com"
+          git config --global user.name "muthu"
+          git add .
+          git commit -m "Automated metadata retrieval from Salesforce"
+          git push origin main
