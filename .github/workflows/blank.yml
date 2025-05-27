@@ -31,7 +31,7 @@ jobs:
             --set-default
 
       - name: Retrieve metadata from Salesforce
-        run: sf project retrieve start --manifest manifest/package.xml
+        run: sf project retrieve start --metadata ApexClass,CustomObject
 
       - name: Commit and push metadata to GitHub
         run: |
