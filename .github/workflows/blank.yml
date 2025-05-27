@@ -21,7 +21,14 @@ jobs:
           sf --version
 
       - name: Authenticate with Salesforce
-        run: sf org login jwt --client-id ${{ secrets.CLIENT_ID }} --jwt-key-file ${{ secrets.JWT_KEY }} --username ${{ secrets.USERNAME }} --instance-url ${{ secrets.INSTANCE_URL }}
+        run:  echo "${{ secrets.JWT_KEY }}" > server.key
+          sf org login jwt \
+            --client-id ${{ secrets.CLIENT_ID }} \
+            --jwt-key-file server.key \
+            --username ${{ secrets.SF_USERNAME }} \
+            --instance-url ${{ secrets.INSTANCE_URL }} \
+            --alias SFDC_v1 \
+            --set-default
 
       - name: Retrieve metadata from Salesforce
         run: sf project retrieve start --manifest manifest/package.xml
