@@ -1,5 +1,16 @@
 name: Retrieve and Deploy Salesforce Metadata
 
+env:
+    BRANCH_NAME: ""
+    GITHUB_USER_NAME: programmer-377
+    GITHUB_USER_EMAIL: muthu19726@gmail.com
+    SOURCE_DIR: ""
+    METADATA: ""
+    MANIFEST_DIR: manifest/package.xml
+    SCRIPT_DIRECTORY: ""
+    IGNORE_CONFLICTS: ""
+    FORCE_PUSH: ""
+
 on:
   workflow_dispatch:
   # schedule:
@@ -21,7 +32,8 @@ jobs:
           sf --version
 
       - name: Authenticate with Salesforce
-        run:  echo "${{ secrets.JWT_KEY }}" > server.key
+        run:  |
+          echo "${{ secrets.JWT_KEY }}" > server.key
           sf org login jwt \
             --client-id ${{ secrets.CLIENT_ID }} \
             --jwt-key-file server.key \
@@ -30,13 +42,48 @@ jobs:
             --alias SFDC_v1 \
             --set-default
 
-      - name: Retrieve metadata from Salesforce
-        run: sf project retrieve start --metadata ApexClass,CustomObject
-
-      - name: Commit and push metadata to GitHub
+      - name: Retrieve Salesforce metadata
+        shell: bash
         run: |
-          git config --global user.email "muthu19726@gmail.com"
-          git config --global user.name "muthu"
-          git add .
-          git commit -m "Automated metadata retrieval from Salesforce"
-          git push origin main
+            deployFlags=()
+            if [ -n "${{ env.SOURCE_DIR }}" ]; then
+            deployFlags+=( --source-dir "${{ env.SOURCE_DIR }}" )
+            fi
+            if [ -n "${{ env.METADATA }}" ]; then
+            deployFlags+=( --metadata "${{ env.METADATA }}" )
+            fi
+            if [ "${{ env.IGNORE_CONFLICTS }}" = "true" ]; then
+            deployFlags+=( --ignore-conflicts )
+            fi
+            if [ -n "${{ env.MANIFEST_DIR }}" ]; then
+            deployFlags+=( --manifest "${{ env.MANIFEST_DIR }}" )
+            fi
+            sf project retrieve start "${deployFlags[@]}"
+      
+      - name: Commit metadata changes
+        shell: bash
+        run: |
+            git config --local user.name ${{ env.GITHUB_USER_NAME }}
+            git config --local user.email ${{ env.GITHUB_USER_EMAIL }}
+            git checkout -b ${{ env.BRANCH_NAME }} || ${{ env.BRANCH_NAME }}
+            git add .
+            git commit -m "Backup Salesforce metadata $(date +'%Y-%m-%d')" || echo "No changes to commit"
+      
+      - name: Push changes to backup branch
+        shell: bash
+        run: |
+            deployFlags=()
+            if [ "${{ env.FORCE_PUSH }}" = "true" ]; then
+            deployFlags+=( --force )
+            fi
+            git push origin ${{ env.BRANCH_NAME }} "${deployFlags[@]}"
+      
+      - name: Notify on Success
+        if: success()
+        run: | 
+          sf apex run --file scripts/callApexSendEmailMethod.apex
+      
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          sf apex run --file scripts/callApexSendFailureEmailMethod.apex
